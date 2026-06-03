@@ -1,18 +1,21 @@
 #
-# Note: This config file is for those who are lazy to type in configuration everytime you run ./ConvertOneNote2MarkDown-v2.ps1
+# Note: This config file is for those who are lazy to type in configuration every time you run ./MarkOneNoteDown.ps1
+#
+# ⚠ SECURITY: This file is dot-sourced as PowerShell code. Only use trusted content.
+#    Do NOT paste code from untrusted sources into this file.
 #
 # Steps:
-#   1) Rename this file to config.ps1. Ensure it is in the same folder as the ConvertOneNote2MarkDown-v2.ps1 script
+#   1) Rename this file to config.ps1. Ensure it is in the same folder as the MarkOneNoteDown.ps1 script
 #   2) Configure the options below to your liking
-#   3) Run the main script: ./ConvertOneNote2MarkDown-v2.ps1. Sit back while the script starts converting immediately.
+#   3) Run the main script: ./MarkOneNoteDown.ps1. Sit back while the script starts converting immediately.
 
 # Whether to do a dry run
 # 0: Convert - Default
 # 1: Dry run
 $dryRun = 0
 
-# Specify folder path that will contain your resulting Notes structure - Default: c:\temp\notes
-$notesdestpath = 'c:\temp\notes'
+# Specify folder path that will contain your resulting Notes structure - Default: .\output (relative to script directory, auto-created if absent)
+$notesdestpath = '.\output'
 
 # Specify a notebook name to convert
 # '': Convert all notebooks - Default

@@ -1,6 +1,7 @@
 /.*
-!/.github
 !/.gitignore
 !/.vscode
+!/assets
 
 config.ps1
+/output

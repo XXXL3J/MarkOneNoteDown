@@ -24,7 +24,7 @@ Describe "Validate-Dependencies" -Tag 'Unit' {
             Mock Write-Warning { 'a warning' }
             Mock Get-Command { $true }
 
-            if ($env:OS -imatch 'Windows') {
+            if ($env:OS -imatch 'Windows' -and $PSVersionTable.PSVersion -lt [version]'7.1') {
                 $warning = Validate-Dependencies
                 $warning | Should -Match 'a warning'
             }else {
@@ -52,7 +52,7 @@ Describe "Compile-Configuration" -Tag 'Unit' {
                 # Fake content of a config.ps1
                 @'
 $dryrun = 0
-$notesdestpath = 'c:\temp\notes\/ ' # Deliberately add a trailing slah(es) and space
+$notesdestpath = '.\output\/ ' # Deliberately add a trailing slah(es) and space
 $targetNotebook = '   ' # Deliberately add extra spaces
 $usedocx = '1'
 # $keepdocx = 1 # Deliberately omit a configuration option from
@@ -96,6 +96,9 @@ $newlineCharacter = 1
                 $typeName = [Microsoft.PowerShell.ToStringCodeMethods]::Type($config[$key]['default'].GetType())
                 Invoke-Expression ('$fakeUserInputs[$key]["value"] -as ' + "[$typeName]")
             }
+            Mock Add-Type { throw "Mock" } # Prevent folder browser dialog from opening
+            Mock Add-Type {}
+            Mock New-Object { $null }
 
             $expectedConfig = Get-DefaultConfiguration
             $expectedConfig['notesdestpath']['value'] = 'c:\foo\bar'
@@ -149,11 +152,12 @@ Describe "Validate-Configuration" -Tag 'Unit' {
             { $config | Validate-Configuration } | Should -Throw 'Expected a value of type'
         }
 
-        It "Throws on config option being a path that does not exist" {
+        It "Auto-creates the directory when it does not exist" {
             $config = Get-DefaultConfiguration
             Mock Test-Path { $false }
+            Mock New-Item { $true }
 
-            { $config | Validate-Configuration } | Should -Throw 'does not exist, or is a file'
+            { $config | Validate-Configuration } | Should -Not -Throw
         }
 
         It "Throws on config option falling outside of valid range of integer values" {
@@ -282,6 +286,14 @@ Describe "Truncate-PathFileName" -Tag 'Unit' {
             $length = 500
 
             { $path | Truncate-PathFileName -Length $length } | Should -Throw 'greater than the maximum allowed range of 255'
+        }
+
+        It "Throw if -Length is less than 1" {
+            $drive = "C:$( [io.path]::DirectorySeparatorChar )" # E.g. C:\
+            $path = $drive + ("a" * 100)
+            $length = 0
+
+            { $path | Truncate-PathFileName -Length $length } | Should -Throw 'less than the minimum allowed range of 1'
         }
 
     }
@@ -1816,7 +1828,7 @@ Describe "Print-ConversionErrors" -Tag 'Unit' {
 
     Context 'Behavior' {
 
-        It "Prints only WriteErrorExceptions of a given array of exceptions" {
+        It "Prints exceptions of a given array of exceptions" {
             $exceptions = @(
                 Write-Error 'foo' 2>&1
                 New-Object System.IO.FileNotFoundException -ArgumentList 'bar'
@@ -1908,7 +1920,12 @@ Describe "Convert-OneNote2MarkDown" -Tag 'Unit' {
                     [object]
                     $Config
                 ,
-                    [Parameter(Mandatory,ValueFromPipeline)]
+                    [Parameter(Mandatory,ParameterSetName='default')]
+                    [ValidateNotNullOrEmpty()]
+                    [object]
+                    $ConversionConfig
+                ,
+                    [Parameter(Mandatory,ParameterSetName='pipeline',ValueFromPipeline)]
                     [ValidateNotNullOrEmpty()]
                     [object]
                     $InputObject
