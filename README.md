@@ -14,19 +14,14 @@ Batch convert OneNote notebooks to Markdown via Pandoc.
 
 ## Quick Start
 
-```powershell
-# 1. Check environment
-.\setup.ps1
+**Double-click `run.bat`** — it checks dependencies, then converts.
 
-# 2. One-time: import Onetastic macro (collapsed paragraphs are NOT exported)
-#    Onetastic tab > New Macro > File > Import > assets/Onetastic-ExpandAllParagraphs.xml
+First-time setup:
 
-# 3. Run (double-click run.bat, or from PowerShell)
-.\MarkOneNoteDown.ps1
-
-# Optional: use a config file to skip prompts
-cp config.example.ps1 config.ps1   # edit then re-run
-```
+| # | Action |
+|---|--------|
+| 1 | Import Onetastic macro to expand collapsed paragraphs: `assets/Onetastic-ExpandAllParagraphs.xml` |
+| 2 | (Optional) `cp config.example.ps1 config.ps1` and edit — skips interactive prompts on next run |
 
 ## Common Errors
 
