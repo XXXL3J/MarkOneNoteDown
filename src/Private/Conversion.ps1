@@ -38,8 +38,6 @@ Function New-SectionGroupConversionConfig {
             continue
         }
 
-        $cfg = [ordered]@{}
-
         if ($LevelsFromRoot -eq 0) {
             "`nBuilding conversion configuration for $( $sectionGroup.name ) [Notebook]" | Write-Host -ForegroundColor DarkGreen
         }else {
@@ -677,12 +675,13 @@ Function Convert-OneNotePage {
 
             "Markdown file ready: $( $pageCfg['filePathNormal'] )" | Write-Host -ForegroundColor Green
         }catch {
+            # Check for specific OneNote publish errors
+            $hresult = if ($_.Exception.InnerException) { $_.Exception.InnerException.HResult } else { 0 }
+            $reason = if ($hresult -eq 0x80042006) { " (page may be empty or contain unsupported content)" } else { "" }
+            "  [SKIP] $( $pageCfg['object'].name ) -- publish failed$reason" | Write-Host -ForegroundColor Yellow
             Write-Error "Failed to convert page: $( $pageCfg['pathFromRoot'] )" -ErrorAction Continue
             if ($ErrorActionPreference -eq 'Stop') {
                 throw
-            }else {
-                Write-Error -Message $_.Exception.Message
-                Write-Error -Message $_.ScriptStackTrace
             }
         }
     }

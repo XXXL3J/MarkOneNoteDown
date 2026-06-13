@@ -5,19 +5,55 @@ Function New-OneNoteConnection {
 
     # Create a OneNote connection. See: https://docs.microsoft.com/en-us/office/client-developer/onenote/application-interface-onenote
     if ($PSVersionTable.PSVersion.Major -le 5) {
-        if ($OneNote = New-Object -ComObject OneNote.Application) {
+        try {
+            $OneNote = New-Object -ComObject OneNote.Application
             $OneNote
-        }else {
-            Write-Error "Failed to make connection to OneNote." -ErrorAction Continue
+        } catch [System.Runtime.InteropServices.COMException] {
+            $hresult = $_.Exception.HResult
+            $msg = "Failed to connect to OneNote (COM error 0x{0:X8})." -f $hresult
+            Write-Error $msg -ErrorAction Continue
+            if ($hresult -eq 0x80080005) {
+                Write-Host @"
+
+=== CO_E_SERVER_EXEC_FAILURE (0x80080005) ===
+This error means you are running PowerShell as Administrator.
+OneNote COM does NOT work from an elevated process -- this is a Windows security restriction, not a bug.
+
+FIX: Close this window, then open a NORMAL (non-admin) PowerShell:
+  - Right-click in the folder -> "Open in Terminal" (NOT "Run as administrator")
+  - Or: Win+R -> powershell -> cd to this folder -> run .\MarkOneNoteDown.ps1
+
+OneNote 365 (Desktop) is fully supported -- just don't run as admin.
+"@ -ForegroundColor Yellow
+            }
             throw
         }
     }else {
         # Works between powershell 5.x (possibly lower) and 7.0, but not >= 7.1. 7.1 and above doesn't seem to support loading Win32 GAC Assemblies.
-        if (Add-Type -Path $env:windir\assembly\GAC_MSIL\Microsoft.Office.Interop.OneNote\15.0.0.0__71e9bce111e9429c\Microsoft.Office.Interop.OneNote.dll -PassThru) {
-            $OneNote = [Microsoft.Office.Interop.OneNote.ApplicationClass]::new()
-            $OneNote
-        }else {
-            Write-Error "Failed to make connection to OneNote." -ErrorAction Continue
+        try {
+            if (Add-Type -Path $env:windir\assembly\GAC_MSIL\Microsoft.Office.Interop.OneNote\15.0.0.0__71e9bce111e9429c\Microsoft.Office.Interop.OneNote.dll -PassThru) {
+                $OneNote = [Microsoft.Office.Interop.OneNote.ApplicationClass]::new()
+                $OneNote
+            } else {
+                Write-Error "Failed to make connection to OneNote." -ErrorAction Continue
+                throw
+            }
+        } catch [System.Runtime.InteropServices.COMException] {
+            $hresult = $_.Exception.HResult
+            $msg = "Failed to connect to OneNote (COM error 0x{0:X8})." -f $hresult
+            Write-Error $msg -ErrorAction Continue
+            if ($hresult -eq 0x80080005) {
+                Write-Host @"
+
+=== CO_E_SERVER_EXEC_FAILURE (0x80080005) ===
+This error means you are running PowerShell as Administrator.
+OneNote COM does NOT work from an elevated process.
+
+FIX: Close this window, then open a NORMAL (non-admin) PowerShell.
+  - Right-click in the folder -> "Open in Terminal" (NOT "Run as administrator")
+  - Or: Win+R -> powershell -> cd to this folder -> run .\MarkOneNoteDown.ps1
+"@ -ForegroundColor Yellow
+            }
             throw
         }
     }

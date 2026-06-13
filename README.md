@@ -20,7 +20,7 @@ First-time setup:
 
 | # | Action |
 |---|--------|
-| 1 | Import Onetastic macro to expand collapsed paragraphs: `assets/Onetastic-ExpandAllParagraphs.xml` |
+| 1 | Import [Onetastic](https://getonetastic.com/download) macro to expand collapsed paragraphs: `assets/Onetastic-ExpandAllParagraphs.xml` |
 | 2 | (Optional) `cp config.example.ps1 config.ps1` and edit — skips interactive prompts on next run |
 
 ## Common Errors

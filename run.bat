@@ -1,11 +1,7 @@
 @echo off
-setlocal EnableDelayedExpansion
+setlocal
 
-:: ============================================================
-:: MarkOneNoteDown Launcher
-:: Double-click to run with automatic dependency check.
-:: ============================================================
-
+title MarkOneNoteDown
 cd /d "%~dp0"
 
 echo =========================================
@@ -16,47 +12,50 @@ echo.
 :: --- 1. PowerShell ---
 echo [1/3] Checking PowerShell...
 where powershell >nul 2>&1
-if %errorlevel% neq 0 (
+if errorlevel 1 (
     echo   [FAIL] PowerShell not found.
-    pause & exit /b 1
+    goto :end
 )
 for /f "tokens=*" %%v in ('powershell -NoProfile -Command "$PSVersionTable.PSVersion.ToString()"') do set PSVER=%%v
-echo   [OK]   PowerShell !PSVER!
+echo   [OK]   PowerShell %PSVER%
 
 :: --- 2. Pandoc ---
 echo [2/3] Checking Pandoc...
 where pandoc >nul 2>&1
-if %errorlevel% neq 0 (
-    echo   [MISS] Pandoc not found - will prompt during run.
-    echo          Install: https://pandoc.org/installing.html
-) else (
-    for /f "tokens=*" %%v in ('pandoc --version 2^>nul ^| findstr /r "^pandoc"') do set PANDOCVER=%%v
-    echo   [OK]   !PANDOCVER!
-)
+if errorlevel 1 goto :pandoc_miss
+for /f "tokens=*" %%v in ('pandoc --version 2^>nul ^| findstr /r /c:"^pandoc"') do echo   [OK]   %%v
+goto :pandoc_done
+:pandoc_miss
+echo   [MISS] Pandoc not found in PATH - will prompt during run.
+echo          Install: https://pandoc.org/installing.html
+:pandoc_done
 
 :: --- 3. Config ---
 echo [3/3] Checking config...
-if exist "config.ps1" (
-    echo   [OK]   config.ps1 found
-) else (
-    echo   [INFO] No config.ps1 - interactive mode will run.
-    echo          Copy config.example.ps1 ^> config.ps1 to skip prompts.
-)
+if exist "config.ps1" goto :config_found
+echo   [INFO] No config.ps1 - interactive mode will run.
+echo          Copy config.example.ps1 ^> config.ps1 to skip prompts.
+goto :config_done
+:config_found
+echo   [OK]   config.ps1 found
+:config_done
 
 echo.
 echo Starting conversion...
 echo.
 
 :: --- Run ---
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\MarkOneNoteDown.ps1" %*
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0MarkOneNoteDown.ps1" %*
+set EXITCODE=%ERRORLEVEL%
 
-if %errorlevel% neq 0 (
-    echo.
-    echo [FAIL] Errors occurred (code %errorlevel%).
-    echo        See README "Common Errors" section.
-) else (
-    echo.
-    echo [OK]   Finished.
-)
+echo.
+if %EXITCODE% neq 0 goto :run_fail
+echo [OK]   Finished.
+goto :end
+:run_fail
+echo [FAIL] Errors occurred (code %EXITCODE%).
+echo        See README.md "Common Errors" section.
+
+:end
 echo.
 pause

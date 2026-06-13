@@ -24,7 +24,7 @@ Function Convert-OneNote2MarkDown {
         foreach ($key in @('notesdestpath')) {
             if ($config[$key]['value'] -is [string] -and -not [io.path]::IsPathRooted($config[$key]['value'])) {
                 $resolved = [io.path]::GetFullPath([io.path]::combine($Script:ProjectRoot, $config[$key]['value']))
-                "Resolved '$key': $( $config[$key]['value'] ) → $resolved" | Write-Verbose
+                "Resolved '$key': $( $config[$key]['value'] ) -> $resolved" | Write-Verbose
                 $config[$key]['value'] = $resolved
             }
         }

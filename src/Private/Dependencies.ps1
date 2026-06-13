@@ -16,7 +16,13 @@ Function Test-Preflight {
         $ok = $false
     }
 
-    # 2. OneNote assemblies (Windows only)
+    # 2. Admin check -- OneNote COM may fail with 80080005 when running elevated
+    $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if ($isAdmin) {
+        "  [WARN] Running as Administrator -- if OneNote COM fails, try running as normal user." | Write-Host -ForegroundColor Yellow
+    }
+
+    # 3. OneNote assemblies (Windows only)
     if ($env:OS -imatch 'Windows') {
         if (Get-Item -Path "$env:windir\assembly\GAC_MSIL\*onenote*" -ErrorAction SilentlyContinue) {
             "  [OK]   OneNote Desktop (assemblies detected)" | Write-Host -ForegroundColor Green
@@ -25,16 +31,40 @@ Function Test-Preflight {
         }
     }
 
-    # 3. Pandoc
+    # 4. Pandoc
     $pandocPath = Get-Command -Name 'pandoc.exe' -ErrorAction SilentlyContinue
+    if (-not $pandocPath) {
+        # Fallback: check common user-install locations
+        $userPaths = @(
+            "$env:LOCALAPPDATA\Pandoc\pandoc.exe"
+            "$env:ProgramFiles\Pandoc\pandoc.exe"
+            "${env:ProgramFiles(x86)}\Pandoc\pandoc.exe"
+        )
+        foreach ($p in $userPaths) {
+            if (Test-Path $p) {
+                $pandocPath = $p
+                # Add to session PATH for downstream use
+                $parentDir = Split-Path $p -Parent
+                if ($env:Path -notlike "*$parentDir*") {
+                    $env:Path = "$parentDir;$env:Path"
+                }
+                break
+            }
+        }
+    }
     if ($pandocPath) {
-        $ver = (& pandoc --version 2>$null | Select-Object -First 1) -replace 'pandoc\s+', ''
-        "  [OK]   Pandoc $ver -- $($pandocPath.Source)" | Write-Host -ForegroundColor Green
+        $ver = if ($pandocPath -is [System.Management.Automation.CommandInfo]) {
+            (& pandoc --version 2>$null | Select-Object -First 1) -replace 'pandoc\s+', ''
+        } else {
+            (& "$pandocPath" --version 2>$null | Select-Object -First 1) -replace 'pandoc\s+', ''
+        }
+        $src = if ($pandocPath -is [System.Management.Automation.CommandInfo]) { $pandocPath.Source } else { $pandocPath }
+        "  [OK]   Pandoc $ver -- $src" | Write-Host -ForegroundColor Green
     } else {
         "  [MISS] Pandoc not found in PATH. Install: https://pandoc.org/installing.html" | Write-Host -ForegroundColor Yellow
     }
 
-    # 4. Word (check registry for Office 2016+)
+    # 5. Word (check registry for Office 2016+)
     if ($env:OS -imatch 'Windows') {
         $wordPath = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\Winword.exe' -ErrorAction SilentlyContinue |
             Select-Object -ExpandProperty '(Default)' -ErrorAction SilentlyContinue
@@ -65,7 +95,30 @@ Function Validate-Dependencies {
 
     # Validate dependencies: pandoc
     $pandocPath = Get-Command -Name 'pandoc.exe' -ErrorAction SilentlyContinue
-    if (! $pandocPath) {
+    if (-not $pandocPath) {
+        # Fallback: check common user-install locations
+        $userPaths = @(
+            "$env:LOCALAPPDATA\Pandoc\pandoc.exe"
+            "$env:ProgramFiles\Pandoc\pandoc.exe"
+            "${env:ProgramFiles(x86)}\Pandoc\pandoc.exe"
+        )
+        foreach ($p in $userPaths) {
+            if (Test-Path $p) {
+                $parentDir = Split-Path $p -Parent
+                if ($env:Path -notlike "*$parentDir*") {
+                    $env:Path = "$parentDir;$env:Path"
+                }
+                $pandocPath = Get-Command -Name 'pandoc.exe' -ErrorAction SilentlyContinue
+                if (-not $pandocPath) {
+                    # If still not found by Get-Command, use the direct path
+                    $pandocPath = $p
+                }
+                "Pandoc found at: $p" | Write-Host -ForegroundColor Green
+                break
+            }
+        }
+    }
+    if (-not $pandocPath) {
         $title = "Pandoc not found"
         $msg = "Pandoc is required but was not found in PATH.`n`nWould you like to install Pandoc via winget (recommended)?"
         $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Install", "Install Pandoc via winget"
@@ -75,8 +128,10 @@ Function Validate-Dependencies {
         if ($result -eq 0) {
             Write-Host "Installing Pandoc via winget..." -ForegroundColor Yellow
             winget install pandoc --accept-source-agreements --accept-package-agreements | Out-Host
-            # Refresh PATH
-            $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+            # Refresh PATH (both Machine and User scope)
+            $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+            $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+            $env:Path = "$machinePath;$userPath"
             $pandocPath = Get-Command -Name 'pandoc.exe' -ErrorAction SilentlyContinue
             if ($pandocPath) {
                 "Pandoc installed successfully: $( $pandocPath.Source )" | Write-Host -ForegroundColor Green
@@ -84,7 +139,7 @@ Function Validate-Dependencies {
                 throw "Pandoc installation may have failed. Please restart PowerShell and try again, or install manually from https://pandoc.org/installing.html"
             }
         } else {
-            throw "Could not locate pandoc.exe. Please ensure pandoc is installed for all users, and available in PATH. If pandoc was just installed using .msi or chocolatey, you may need to restart Powershell or the computer for pandoc to be set correctly in PATH."
+            throw "Could not locate pandoc.exe. Please ensure pandoc is installed and available in PATH (Machine or User). If pandoc was just installed, you may need to restart Powershell or the computer for PATH to be updated."
         }
     }
 }

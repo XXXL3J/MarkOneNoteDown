@@ -24,14 +24,38 @@ if ($psVersion -ge [version]'7.1') {
 # 2. Pandoc
 Write-Host "`n[2/3] Pandoc..." -ForegroundColor Yellow
 $pandoc = Get-Command pandoc.exe -ErrorAction SilentlyContinue
+if (-not $pandoc) {
+    # Fallback: check common user-install locations
+    $userPaths = @(
+        "$env:LOCALAPPDATA\Pandoc\pandoc.exe"
+        "$env:ProgramFiles\Pandoc\pandoc.exe"
+        "${env:ProgramFiles(x86)}\Pandoc\pandoc.exe"
+    )
+    foreach ($p in $userPaths) {
+        if (Test-Path $p) {
+            $parentDir = Split-Path $p -Parent
+            if ($env:Path -notlike "*$parentDir*") {
+                $env:Path = "$parentDir;$env:Path"
+            }
+            $pandoc = Get-Command pandoc.exe -ErrorAction SilentlyContinue
+            if (-not $pandoc) { $pandoc = $p }
+            Write-Host "  [OK]   Found at: $p" -ForegroundColor Green
+            break
+        }
+    }
+}
 if ($pandoc) {
     $ver = & pandoc --version | Select-Object -First 1
+    $src = if ($pandoc -is [System.Management.Automation.CommandInfo]) { $pandoc.Source } else { $pandoc }
     Write-Host "  [OK]   $ver" -ForegroundColor Green
-    Write-Host "  Path:  $($pandoc.Source)" -ForegroundColor DarkGray
+    Write-Host "  Path:  $src" -ForegroundColor DarkGray
 } elseif ($InstallPandoc) {
     Write-Host "  Installing Pandoc via winget..." -ForegroundColor Yellow
     winget install pandoc --accept-source-agreements --accept-package-agreements
-    $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    # Refresh PATH (both Machine and User scope)
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $env:Path = "$machinePath;$userPath"
     $pandoc = Get-Command pandoc.exe -ErrorAction SilentlyContinue
     if ($pandoc) { Write-Host "  [OK]   Installed successfully." -ForegroundColor Green }
     else { $issues += "Pandoc not found" }

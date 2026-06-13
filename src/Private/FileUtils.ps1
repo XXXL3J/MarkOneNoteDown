@@ -143,8 +143,8 @@ Function Set-ContentNoBom {
     process {
         if ($PSVersionTable.PSVersion.Major -le 5) {
             try {
-                $content = $Value -join ''
-                [IO.File]::WriteAllLines($LiteralPath, $content)
+                $content = $Value -join "`n"
+                [IO.File]::WriteAllText($LiteralPath, $content)
             }catch {
                 if ($ErrorActionPreference -eq 'Stop') {
                     throw
